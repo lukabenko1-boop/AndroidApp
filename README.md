@@ -1,6 +1,6 @@
 # KI BLOBS 3D — Aerial Brawl
 
-A playable **3D aerial fighting game** in the *Lemming Ball Z* / Dragon-Ball-Z-arena tradition: two round "blobs" fly around a 3D arena, trade melee blows, **charge ki**, **transform** into more powerful forms, fire **energy blasts and beams**, and **block** — first to drain the other's health wins.
+A playable **3D aerial fighting game** in the *Lemming Ball Z* / Dragon-Ball-Z-arena tradition: two **humanoid fighters** fly around a large 3D arena, trade melee blows, **charge ki**, **transform** into more powerful forms, fire **energy blasts and beams**, and **block** — first to drain the other's health wins.
 
 It's an **original** take (original name, art, and code) so it stays clear of the *Lemmings* and *Dragon Ball* trademarks. The whole thing is a **single self-contained HTML file** with a hand-written **software-3D engine** on a 2D canvas — no external libraries, no WebGL, no build step — so it runs anywhere, including inside a sandboxed page.
 
@@ -31,10 +31,11 @@ Movement is on the **horizontal plane** (the blob auto-hovers to the fight's hei
 ## What's implemented
 
 **3D engine (software, on canvas)**
-- Perspective camera (lookAt) that follows the midpoint of the fighters
-- Painter's-algorithm depth sorting across terrain, fighters, beams, projectiles, and particles
-- **3D destructible heightmap terrain** — a lit, shaded mesh whose ground carves into real craters (blasts, beams, slams) in the X/Z plane, with flying dirt
-- Blob shadows projected onto the terrain for grounding
+- Perspective camera (lookAt) that **follows the midpoint and auto-zooms** to the fighters' separation, with smoothing
+- Painter's-algorithm depth sorting + **frustum culling** across terrain, fighters, beams, projectiles, and particles — a **large arena** (~1640 × 1480 units) stays at 60fps
+- **Textured, lit, 3D destructible heightmap terrain** — height-banded palette (dirt → grass → rock), directional lighting, slope rock, per-quad variation, and **scorched crater rings**; blasts, beams, and slams carve real craters in the X/Z plane with flying dirt
+- **Animated humanoid fighters** — head, torso, arms, and legs with distinct poses for idle, fly, move, punch, charge, beam, block, and hit, plus form-colored spiky hair
+- Shadows projected onto the terrain for grounding
 
 **Combat**
 - Full-3D flight with momentum, drag, auto-hover altitude, wall/ceiling bounds, and **slam impacts** (crater + bonus damage + bounce)
