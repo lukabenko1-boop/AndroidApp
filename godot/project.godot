@@ -1,0 +1,24 @@
+; Engine configuration file.
+; Open this folder in Godot 4.3+ (Project Manager -> Import -> select this project.godot).
+
+config_version=5
+
+[application]
+
+config/name="KI Blobs 3D"
+run/main_scene="res://Main.tscn"
+config/features=PackedStringArray("4.3", "GL Compatibility")
+config/icon="res://icon.svg"
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/handheld/orientation=0
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"

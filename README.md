@@ -4,6 +4,11 @@ A playable **3D aerial fighting game** in the *Lemming Ball Z* / Dragon-Ball-Z-a
 
 It's an **original** take (original name, art, and code) so it stays clear of the *Lemmings* and *Dragon Ball* trademarks. The whole thing is a **single self-contained HTML file** with a hand-written **software-3D engine** on a 2D canvas — no external libraries, no WebGL, no build step — so it runs anywhere, including inside a sandboxed page.
 
+## Two versions in this repo
+
+- **`index.html`** — the **web prototype** (guaranteed-runnable, software 3D). Open it in any browser.
+- **`godot/`** — a native **Godot 4** port for **real GPU 3D + an Android APK** (lit meshes, shadows, procedural sky, destructible heightmap terrain). See [`godot/README.md`](godot/README.md) to open, run, and export. *Note: it's an author-reviewed scaffold that hasn't been opened in the editor yet (the Godot binary couldn't be fetched in the build sandbox), so expect minor first-run tuning.*
+
 ## Play
 
 Open `index.html` in any modern browser (desktop or mobile). No dependencies.
