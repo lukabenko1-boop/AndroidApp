@@ -1,6 +1,6 @@
 # KI BLOBS 3D — Aerial Brawl
 
-A playable **3D aerial fighting game** in the *Lemming Ball Z* / Dragon-Ball-Z-arena tradition: two **humanoid fighters** fly around a large 3D arena, trade melee blows, **charge ki**, **transform** into more powerful forms, fire **energy blasts and beams**, and **block** — first to drain the other's health wins.
+A playable **2.5D aerial fighting game** in the *Lemming Ball Z* / Dragon-Ball-Z-arena tradition: two **stick-figure fighters** duel in a **3D world but on a locked 2D plane** (move left/right + fly up/down, depth fixed — exactly like Lemming Ball Z). They trade melee blows, **charge ki**, **transform** into more powerful forms, fire **energy blasts and beams**, and **block** — first to drain the other's health wins.
 
 It's an **original** take (original name, art, and code) so it stays clear of the *Lemmings* and *Dragon Ball* trademarks. The whole thing is a **single self-contained HTML file** with a hand-written **software-3D engine** on a 2D canvas — no external libraries, no WebGL, no build step — so it runs anywhere, including inside a sandboxed page.
 
@@ -22,7 +22,7 @@ Movement is on the **horizontal plane** (the blob auto-hovers to the fight's hei
 
 | Action | Keyboard | Touch |
 |---|---|---|
-| Move (left/right + near/far, **up = away**) | WASD or Arrow keys | Left stick |
+| Move (**2-axis**: left/right + fly up/down; depth locked) | WASD or Arrow keys | Left stick |
 | Punch (melee) | `J` | PUNCH |
 | Ki blast | `K` | BLAST |
 | Charge ki (hold) | `L` | CHARGE |
@@ -39,7 +39,8 @@ Movement is on the **horizontal plane** (the blob auto-hovers to the fight's hei
 - Perspective camera (lookAt) that **follows the midpoint and auto-zooms** to the fighters' separation, with smoothing
 - Painter's-algorithm depth sorting + **frustum culling** across terrain, fighters, beams, projectiles, and particles — a **large arena** (~1640 × 1480 units) stays at 60fps
 - **Textured, lit, 3D destructible heightmap terrain** — height-banded palette (dirt → grass → rock), directional lighting, slope rock, per-quad variation, and **scorched crater rings**; blasts, beams, and slams carve real craters in the X/Z plane with flying dirt
-- **Animated humanoid fighters** — head, torso, arms, and legs with distinct poses for idle, fly, move, punch, charge, beam, block, and hit, plus form-colored spiky hair
+- **Animated stick-figure fighters** — head, spine, and stick limbs with distinct poses for idle, fly, move, punch, charge, beam, block, and hit, plus form-colored spiky hair
+- **Lemming-Ball-Z-style 2.5D**: fighters are locked to a single depth plane and move on two axes (left/right + altitude) with gravity, while the world renders in full 3D behind them via a front-facing follow-and-zoom camera
 - Shadows projected onto the terrain for grounding
 
 **Combat**
