@@ -2,7 +2,7 @@
 
 A native **Godot 4** port of the KI BLOBS aerial fighter (the web prototype lives in
 `../index.html`). This version uses **real GPU 3D**: lit meshes and shadows, a
-procedural sky, humanoid fighters built from primitives, and a **destructible 3D
+procedural sky, stick-figure fighters built from primitives, and a **destructible 3D
 heightmap terrain** — targeting a **one-click Android APK**.
 
 > ⚠️ **Status: author-reviewed scaffold, not yet run in-engine.** It was written in a
@@ -31,7 +31,7 @@ Movement is on the horizontal plane; altitude auto-hovers to the fight.
 
 | Action | Keyboard | Touch |
 |---|---|---|
-| Move (x + depth, **up = away**) | WASD / Arrows | Left stick |
+| Move (**2-axis**: left/right + fly up/down; depth locked) | WASD / Arrows | Left stick |
 | Punch | `J` | PUNCH |
 | Ki blast | `K` | BLAST |
 | Charge ki (hold) | `L` | CHARGE |
@@ -45,7 +45,7 @@ Movement is on the horizontal plane; altitude auto-hovers to the fight.
 - **`Terrain.gd`** — 40×36 destructible heightmap `ArrayMesh` with per-vertex
   dirt/grass/rock colours; `carve()` lowers vertices (craters) from blasts, beams, and
   slams and rebuilds once per frame; `height_at()` bilinear sampling for collisions.
-- **`Fighter.gd`** — humanoid built from primitives (head, torso, arm/leg pivots, hair
+- **`Fighter.gd`** — stick figure built from primitives (head, thin spine, arm/leg pivots, hair
   cone, emissive aura sphere + light, world-space beam cylinder). Ports the full system
   set: 3D flight + auto-hover, drag/slam physics, melee, blasts, chargeable **beams**,
   ki **charge → tiers → SURGE**, **transformations** (Base/Ascended/Super with per-form

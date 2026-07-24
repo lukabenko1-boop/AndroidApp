@@ -1,13 +1,15 @@
 extends Node3D
 class_name Fighter
-## A humanoid ki fighter. Ports the web build's systems to Godot 3D:
-## flight physics + auto-hover, melee, ki blasts, chargeable beams, ki charging
-## with power tiers -> SURGE, named transformations (Base/Ascended/Super) with
-## per-form aura colours, blocking, slams, and an FSM AI.
+## A stick-figure ki fighter (2.5D, Lemming-Ball-Z-style). Ports the web build:
+## two-axis flight (X + altitude) on a locked depth plane, melee, ki blasts,
+## chargeable beams, ki charging with power tiers -> SURGE, named transformations
+## (Base/Ascended/Super) with per-form aura colours, blocking, slams, and an FSM AI.
 
 const ACCEL := 95.0
 const MAXSPD := 20.0
 const DRAG := 3.2
+const GRAV := 22.0
+const PLANE_Z := 14.0   # fighters are locked to this depth plane (2.5D like Lemming Ball Z)
 const HOVER := 5.0
 const ALTK := 5.2
 const KI_MAX := 100.0
@@ -155,47 +157,48 @@ func _limb(shoulder: Vector3, length: float, r: float, c: Color) -> Node3D:
 func _build_body() -> void:
 	_body_mat = _mat(base_color, 0.45)
 	var dark := base_color.darkened(0.35)
-	# torso
-	var torso := _capsule(0.7, 1.4, base_color)
-	torso.position = Vector3(0, 0.9, 0)
-	torso.material_override = _body_mat
-	add_child(torso)
-	# head
+	# ---- STICK FIGURE ----
+	# spine (thin)
+	var spine := _capsule(0.09, 1.3, base_color)
+	spine.position = Vector3(0, 0.95, 0)
+	spine.material_override = _body_mat
+	add_child(spine)
+	# head (small)
 	_head = MeshInstance3D.new()
 	var hs := SphereMesh.new()
-	hs.radius = 0.62
-	hs.height = 1.24
+	hs.radius = 0.42
+	hs.height = 0.84
 	_head.mesh = hs
-	_head.position = Vector3(0, 2.05, 0)
-	_head.material_override = _mat(base_color.lightened(0.12), 0.4)
+	_head.position = Vector3(0, 2.0, 0)
+	_head.material_override = _mat(base_color.lightened(0.14), 0.4)
 	add_child(_head)
-	# hair (cone) — front tilt, recoloured on transform
+	# hair (cone) — recoloured on transform
 	_hair = MeshInstance3D.new()
 	var cone := CylinderMesh.new()
 	cone.top_radius = 0.0
-	cone.bottom_radius = 0.34
-	cone.height = 0.7
+	cone.bottom_radius = 0.26
+	cone.height = 0.6
 	_hair.mesh = cone
-	_hair.position = Vector3(0, 2.7, -0.05)
+	_hair.position = Vector3(0, 2.5, -0.04)
 	_hair.rotation = Vector3(-0.3, 0, 0)
 	_hair_mat = _mat(dark, 0.5)
 	_hair.material_override = _hair_mat
 	add_child(_hair)
 	# eyes (front = -Z)
-	for sx in [-0.22, 0.22]:
+	for sx in [-0.16, 0.16]:
 		var eye := MeshInstance3D.new()
 		var es := SphereMesh.new()
-		es.radius = 0.12
-		es.height = 0.24
+		es.radius = 0.09
+		es.height = 0.18
 		eye.mesh = es
-		eye.position = Vector3(sx, 2.12, -0.5)
+		eye.position = Vector3(sx, 2.05, -0.36)
 		eye.material_override = _mat(Color(0.08, 0.1, 0.14), 0.3)
 		add_child(eye)
-	# limbs
-	_arm_l = _limb(Vector3(-0.62, 1.5, 0), 1.05, 0.2, dark)
-	_arm_r = _limb(Vector3(0.62, 1.5, 0), 1.05, 0.2, dark)
-	_leg_l = _limb(Vector3(-0.28, 0.25, 0), 1.15, 0.24, dark)
-	_leg_r = _limb(Vector3(0.28, 0.25, 0), 1.15, 0.24, dark)
+	# limbs (thin sticks, in the fighter's colour)
+	_arm_l = _limb(Vector3(-0.12, 1.55, 0), 0.95, 0.08, base_color)
+	_arm_r = _limb(Vector3(0.12, 1.55, 0), 0.95, 0.08, base_color)
+	_leg_l = _limb(Vector3(-0.12, 0.35, 0), 1.05, 0.09, base_color)
+	_leg_r = _limb(Vector3(0.12, 0.35, 0), 1.05, 0.09, base_color)
 	# aura sphere (emissive, additive)
 	_aura_mesh = MeshInstance3D.new()
 	var as3 := SphereMesh.new()
@@ -311,7 +314,7 @@ func control(inp: Dictionary, o: Fighter, delta: float) -> void:
 	var sm : float = FORMS[form].spd
 	var slow := 0.14 if beam_state != "none" else (0.18 if charging else (0.4 if blocking else 1.0))
 	vel.x += inp.get("mx", 0.0) * slow * ACCEL * sm * delta
-	vel.z += inp.get("mz", 0.0) * slow * ACCEL * sm * delta
+	vel.y += inp.get("mz", 0.0) * slow * ACCEL * sm * delta   # second axis = altitude (2.5D)
 	if beam_state == "none":
 		if inp.get("punch", false): do_melee(o)
 		if inp.get("blast", false): do_blast(o)
@@ -356,25 +359,23 @@ func tick(delta: float, inp: Dictionary, o: Fighter) -> void:
 		ki = maxf(0.0, ki - FORMS[form].drain * delta)
 		if form_timer <= 0.0 or ki <= 0.0:
 			form = 0
-	# physics
+	# physics: two-axis flight (X + altitude Y) with gravity, depth Z locked to the plane
 	var dr : float = exp(-DRAG * delta)
 	vel.x *= dr
-	vel.z *= dr
-	var hs := Vector2(vel.x, vel.z).length()
+	vel.y *= dr
+	vel.y -= GRAV * delta
+	var hs := Vector2(vel.x, vel.y).length()
 	var mx : float = MAXSPD * FORMS[form].spd
 	if hs > mx:
 		vel.x *= mx / hs
-		vel.z *= mx / hs
-	var gy := terrain.height_at(global_position.x, global_position.z)
-	if hitstun <= 0.0:
-		var desired : float = maxf(gy + RADIUS + HOVER * 0.5, gy + HOVER * 0.4 + (o.global_position.y - gy) * 0.5)
-		vel.y += (desired - global_position.y) * ALTK * delta - vel.y * 3.2 * delta
-	else:
-		vel.y -= 12.0 * delta
-	global_position += vel * delta
+		vel.y *= mx / hs
+	vel.z = 0.0
+	global_position.z = PLANE_Z
+	var gy := terrain.height_at(global_position.x, PLANE_Z)
+	global_position.x += vel.x * delta
+	global_position.y += vel.y * delta
 	# bounds
 	global_position.x = clampf(global_position.x, terrain.AX0 + RADIUS, terrain.AX1 - RADIUS)
-	global_position.z = clampf(global_position.z, terrain.AZ0 + RADIUS, terrain.AZ1 - RADIUS)
 	if global_position.y > 46.0:
 		global_position.y = 46.0
 		vel.y = -absf(vel.y) * 0.3
@@ -383,14 +384,13 @@ func tick(delta: float, inp: Dictionary, o: Fighter) -> void:
 		var imp := -vel.y
 		global_position.y = gy + RADIUS
 		if imp > SLAM_SPD:
-			terrain.carve(global_position.x, global_position.z, RADIUS * 2.0, 1.4)
+			terrain.carve(global_position.x, PLANE_Z, RADIUS * 2.0, 1.4)
 			hp = maxf(0.0, hp - (imp - SLAM_SPD) * SLAM_K)
 			vel.y = imp * 0.42
 		else:
 			vel.y = absf(vel.y) * 0.3
 		vel.x *= 0.85
-		vel.z *= 0.85
-	# face opponent
+	# face opponent (profile to the front camera)
 	var flat := Vector3(o.global_position.x, global_position.y, o.global_position.z)
 	if global_position.distance_to(flat) > 0.2:
 		look_at(flat, Vector3.UP)
@@ -415,7 +415,7 @@ func _animate(delta: float) -> void:
 		aL = Vector3(-1.4, 0, 0.15); aR = Vector3(-1.4, 0, -0.15)
 	elif charging:
 		aL = Vector3(0.7, 0, 0.5); aR = Vector3(0.7, 0, -0.5)
-	elif Vector2(vel.x, vel.z).length() > 6.0:
+	elif Vector2(vel.x, vel.y).length() > 6.0:
 		var s := sin(t * 10.0) * 0.5
 		aL = Vector3(0.2 + s, 0, 0.2); aR = Vector3(0.2 - s, 0, -0.2)
 		lL = Vector3(0.3 - s, 0, 0.08); lR = Vector3(0.3 + s, 0, -0.08)
@@ -481,21 +481,23 @@ func ai_input(o: Fighter, delta: float) -> Dictionary:
 	var inp := {"mx": 0.0, "mz": 0.0, "charge": false, "block": false, "beam": false,
 		"punch": false, "blast": false, "transform": false}
 	var dx := o.global_position.x - global_position.x
-	var dz := o.global_position.z - global_position.z
+	var dy := o.global_position.y - global_position.y
 	var dist := global_position.distance_to(o.global_position)
 	var tX : float = signf(dx) if dx != 0.0 else 1.0
-	var tZ : float = signf(dz) if dz != 0.0 else 1.0
+	var tY : float = signf(dy) if dy != 0.0 else 1.0
+	# second axis (mz) now drives altitude; bias upward so the AI holds height vs gravity
 	if overcharge >= 100.0 and form < 2 and randf() < 0.5:
 		inp.transform = true
 	if _ai_charge_t > 0.0:
 		_ai_charge_t -= delta
-		if dist < 14.0: inp.mx = -tX; inp.mz = -tZ
-		else: inp.charge = true
+		if dist < 14.0: inp.mx = -tX; inp.mz = 0.4
+		else: inp.charge = true; inp.mz = 0.15
 		return inp
 	if _ai_beam_t > 0.0:
 		_ai_beam_t -= delta
 		inp.beam = true
-		if dist < 18.0: inp.mx = -tX * 0.5; inp.mz = -tZ * 0.5
+		inp.mz = tY * 0.6 if absf(dy) > 4.0 else 0.1
+		if dist < 18.0: inp.mx = -tX * 0.5
 		return inp
 	if _ai_think <= 0.0:
 		_ai_think = 0.28 + randf() * 0.4
@@ -512,15 +514,16 @@ func ai_input(o: Fighter, delta: float) -> Dictionary:
 	match _ai_mode:
 		"charge":
 			inp.charge = ki < KI_MAX * 0.9
-			if dist < 15.0: inp.mx = -tX; inp.mz = -tZ; inp.charge = false
-		"approach": inp.mx = tX; inp.mz = tZ
+			inp.mz = 0.2
+			if dist < 15.0: inp.mx = -tX; inp.charge = false
+		"approach": inp.mx = tX; inp.mz = tY if absf(dy) > 3.0 else 0.2
 		"blast":
 			inp.mx = -tX * 0.5 if dist < 22.0 else _ai_jx
-			inp.mz = -tZ * 0.5 if dist < 22.0 else 0.0
+			inp.mz = tY if absf(dy) > 3.0 else 0.15
 			if blast_cd <= 0.0 and randf() < 0.5: inp.blast = true
 		"melee":
-			inp.mx = tX; inp.mz = tZ
+			inp.mx = tX; inp.mz = tY if absf(dy) > 2.0 else 0.2
 			if dist < MELEE_RANGE and melee_cd <= 0.0: inp.punch = true
 			if randf() < 0.15: inp.block = true
-		"reposition": inp.mx = -tX + _ai_jx; inp.mz = -tZ
+		"reposition": inp.mx = -tX + _ai_jx; inp.mz = 0.3
 	return inp

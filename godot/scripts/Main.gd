@@ -158,10 +158,11 @@ func _on_stick_input(ev: InputEvent) -> void:
 		touch.mz = -d.y
 
 func _place_fighters() -> void:
-	_reset_fighter(p1, -14.0, 26.0)
-	_reset_fighter(p2, 14.0, 44.0)
+	_reset_fighter(p1, -12.0)
+	_reset_fighter(p2, 12.0)
 
-func _reset_fighter(f: Fighter, x: float, z: float) -> void:
+func _reset_fighter(f: Fighter, x: float) -> void:
+	var z := Fighter.PLANE_Z
 	var y := terrain.height_at(x, z) + Fighter.RADIUS + Fighter.HOVER
 	f.reset(Vector3(x, y, z), f.is_cpu)
 
@@ -231,11 +232,11 @@ func _process(delta: float) -> void:
 	hud.queue_redraw()
 
 func _update_camera(delta: float) -> void:
+	# front-facing camera on the X-Y play plane (2.5D), following mid X and Y
 	var mid := (p1.global_position + p2.global_position) * 0.5
-	var sep := p1.global_position.distance_to(p2.global_position)
-	var zoom : float = clampf(sep, 16.0, 70.0)
-	var des_eye := Vector3(mid.x, 12.0 + zoom * 0.42, mid.z - (18.0 + zoom * 0.9))
-	var des_tgt := Vector3(mid.x, 4.0, mid.z + 5.0)
+	var sep : float = clampf(Vector2(p1.global_position.x - p2.global_position.x, p1.global_position.y - p2.global_position.y).length(), 10.0, 60.0)
+	var des_eye := Vector3(mid.x, mid.y + 3.0 + sep * 0.12, Fighter.PLANE_Z - (22.0 + sep * 0.85))
+	var des_tgt := Vector3(mid.x, mid.y * 0.7 + 2.0, Fighter.PLANE_Z)
 	var k : float = 1.0 - exp(-3.5 * delta)
 	cam_eye = cam_eye.lerp(des_eye, k)
 	cam_tgt = cam_tgt.lerp(des_tgt, k)
