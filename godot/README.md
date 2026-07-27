@@ -32,6 +32,9 @@ Movement is on the horizontal plane; altitude auto-hovers to the fight.
 | Action | Keyboard | Touch |
 |---|---|---|
 | Move (**2-axis**: left/right + fly up/down; depth locked) | WASD / Arrows | Left stick |
+
+**🎮 Xbox-style controller** (auto-detected): Left stick / D-pad move · **A** Punch · **X** Blast · **B** Block · **Y** Transform · **LB/LT** Charge · **RB/RT** Beam · **Start** start/rematch.
+
 | Punch | `J` | PUNCH |
 | Ki blast | `K` | BLAST |
 | Charge ki (hold) | `L` | CHARGE |

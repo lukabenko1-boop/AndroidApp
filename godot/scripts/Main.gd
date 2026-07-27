@@ -185,6 +185,13 @@ func _input(ev: InputEvent) -> void:
 			KEY_K: blast_q = true
 			KEY_T: transform_q = true
 			KEY_SPACE: start_q = true
+	# Xbox-style gamepad edge buttons
+	elif ev is InputEventJoypadButton and ev.pressed:
+		match ev.button_index:
+			JOY_BUTTON_A: punch_q = true; start_q = true
+			JOY_BUTTON_X: blast_q = true
+			JOY_BUTTON_Y: transform_q = true
+			JOY_BUTTON_START: start_q = true
 
 func _p1_input() -> Dictionary:
 	var mx := 0.0
@@ -193,13 +200,25 @@ func _p1_input() -> Dictionary:
 	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT): mx += 1.0
 	if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP): mz += 1.0
 	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN): mz -= 1.0
+	# Xbox-style gamepad: left stick + d-pad move (X + fly up/down)
+	var gx := Input.get_joy_axis(0, JOY_AXIS_LEFT_X)
+	var gy := Input.get_joy_axis(0, JOY_AXIS_LEFT_Y)
+	if absf(gx) > 0.2: mx += gx
+	if absf(gy) > 0.2: mz += -gy
+	if Input.is_joy_button_pressed(0, JOY_BUTTON_DPAD_LEFT): mx -= 1.0
+	if Input.is_joy_button_pressed(0, JOY_BUTTON_DPAD_RIGHT): mx += 1.0
+	if Input.is_joy_button_pressed(0, JOY_BUTTON_DPAD_UP): mz += 1.0
+	if Input.is_joy_button_pressed(0, JOY_BUTTON_DPAD_DOWN): mz -= 1.0
 	mx = clampf(mx + touch.mx, -1.0, 1.0)
 	mz = clampf(mz + touch.mz, -1.0, 1.0)
+	var g_charge := Input.is_joy_button_pressed(0, JOY_BUTTON_LEFT_SHOULDER) or Input.get_joy_axis(0, JOY_AXIS_TRIGGER_LEFT) > 0.4
+	var g_block := Input.is_joy_button_pressed(0, JOY_BUTTON_B)
+	var g_beam := Input.is_joy_button_pressed(0, JOY_BUTTON_RIGHT_SHOULDER) or Input.get_joy_axis(0, JOY_AXIS_TRIGGER_RIGHT) > 0.4
 	return {
 		"mx": mx, "mz": mz,
-		"charge": Input.is_key_pressed(KEY_L) or touch.charge,
-		"block": Input.is_key_pressed(KEY_SHIFT) or touch.block,
-		"beam": Input.is_key_pressed(KEY_I) or touch.beam,
+		"charge": Input.is_key_pressed(KEY_L) or touch.charge or g_charge,
+		"block": Input.is_key_pressed(KEY_SHIFT) or touch.block or g_block,
+		"beam": Input.is_key_pressed(KEY_I) or touch.beam or g_beam,
 		"punch": punch_q or touch.punch_q,
 		"blast": blast_q or touch.blast_q,
 		"transform": transform_q,

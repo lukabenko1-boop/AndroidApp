@@ -44,7 +44,7 @@
       <div class="btn" id="bBeam">BEAM</div>
     </div>
   </div>
-  <div id="hint">MOVE WASD/Arrows (2-axis: ←→ + fly up/down) · <b>J</b> Punch · <b>K</b> Blast · <b>L</b> Charge · <b>I</b> Beam · <b>Shift</b> Block · <b>T</b> Transform · <b>Space</b> Start</div>
+  <div id="hint">Keyboard: WASD/Arrows (←→ + fly up/down) · <b>J</b> Punch · <b>K</b> Blast · <b>L</b> Charge · <b>I</b> Beam · <b>Shift</b> Block · <b>T</b> Transform · <b>Space</b> Start &nbsp;|&nbsp; 🎮 Xbox: stick/d-pad move · <b>A</b> Punch · <b>X</b> Blast · <b>B</b> Block · <b>Y</b> Transform · <b>LB</b> Charge · <b>RB</b> Beam</div>
 </div></div>
 
 <script>
@@ -137,6 +137,28 @@ hb('bPunch',()=>{input.punchQ=true;input.start=true;});hb('bBlast',()=>{input.bl
 hb('bCharge',()=>{input.charge=true;input.start=true;},()=>{input.charge=false;});
 hb('bBlock',()=>{input.block=true;input.start=true;},()=>{input.block=false;});
 hb('bBeam',()=>{input.beam=true;input.start=true;},()=>{input.beam=false;});
+// ---- Xbox-style gamepad (Gamepad API) ----
+// Left stick / D-pad = move (X + fly up/down). A=Punch  X=Blast  B=Block(hold)
+// Y=Transform  LB/LT=Charge(hold)  RB/RT=Beam(hold)  Start/A=start/rematch
+let gpPrev=[],gpOn=false;
+window.addEventListener('gamepadconnected',()=>{gpOn=true;aInit();});
+function pollGamepad(){
+  const gps=navigator.getGamepads?navigator.getGamepads():[];let gp=null;
+  for(const g of gps){if(g&&g.connected){gp=g;break;}}
+  if(!gp)return {mx:0,mz:0,charge:false,block:false,beam:false};
+  const dz=v=>Math.abs(v)<0.20?0:v;
+  let mx=dz(gp.axes[0]||0),mz=-dz(gp.axes[1]||0);
+  const b=gp.buttons.map(x=>x&&(x.pressed||x.value>0.4));
+  if(b[14])mx-=1;if(b[15])mx+=1;if(b[12])mz+=1;if(b[13])mz-=1;   // d-pad
+  mx=clamp(mx,-1,1);mz=clamp(mz,-1,1);
+  const edge=i=>b[i]&&!gpPrev[i];
+  if(edge(0)){input.punchQ=true;input.start=true;}   // A
+  if(edge(2))input.blastQ=true;                       // X
+  if(edge(3))input.transformQ=true;                   // Y
+  if(edge(9))input.start=true;                        // Start
+  gpPrev=b;
+  return {mx,mz,charge:b[4]||b[6],block:b[1],beam:b[5]||b[7]};   // LB/LT, B, RB/RT
+}
 
 // ================================================== TERRAIN (3D destructible heightmap, textured)
 let hmap,scorch;const gi=(i,j)=>j*(GX+1)+i;
@@ -353,9 +375,10 @@ function stepSparks(dt){for(const s of sparks){s.t+=dt;s.vy-=460*dt;s.x+=s.vx*dt
 function stepScorch(dt){const k=Math.exp(-0.25*dt);for(let i=0;i<scorch.length;i++)if(scorch[i]>0)scorch[i]*=k;}
 
 function update(dt){perf+=dt;if(shake>0)shake=Math.max(0,shake-dt*40);if(flashScreen>0)flashScreen=Math.max(0,flashScreen-dt*2.5);
+  const gp=pollGamepad();
   if(state==='playing'){if(introT>0)introT-=dt;
     let a;if(introT>0)a={mx:0,mz:0,charge:false,block:false,beam:false,punchQ:false,blastQ:false,transformQ:false};
-    else{const km=keyMove();a={mx:clamp(km[0]+tmx,-1,1),mz:clamp(km[1]+tmz,-1,1),charge:input.charge,block:input.block,beam:input.beam,punchQ:input.punchQ,blastQ:input.blastQ,transformQ:input.transformQ};}
+    else{const km=keyMove();a={mx:clamp(km[0]+tmx+gp.mx,-1,1),mz:clamp(km[1]+tmz+gp.mz,-1,1),charge:input.charge||gp.charge,block:input.block||gp.block,beam:input.beam||gp.beam,punchQ:input.punchQ,blastQ:input.blastQ,transformQ:input.transformQ};}
     const b=introT>0?{mx:0,mz:0,charge:false,block:false,beam:false,punchQ:false,blastQ:false,transformQ:false}:P2.aiThink(P1,dt);
     P1.update(dt,a,P2);P2.update(dt,b,P1);resolveBeams(dt);stepProjectiles(dt);stepSparks(dt);stepScorch(dt);
     if(!P1.alive||!P2.alive){state='ko';winner=P1.alive?P1:P2;koTimer=0;SFX.ko();shake=14;flashScreen=1;}

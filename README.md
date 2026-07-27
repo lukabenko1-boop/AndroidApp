@@ -18,18 +18,18 @@ Open `index.html` in any modern browser (desktop or mobile). No dependencies.
 
 ## Controls
 
-Movement is on the **horizontal plane** (the blob auto-hovers to the fight's height, so you only steer left/right and near/far):
+Two-axis movement: steer left/right and fly up/down (depth is locked to a plane, LBZ-style). **Xbox-style controllers are supported** — just plug one in.
 
-| Action | Keyboard | Touch |
-|---|---|---|
-| Move (**2-axis**: left/right + fly up/down; depth locked) | WASD or Arrow keys | Left stick |
-| Punch (melee) | `J` | PUNCH |
-| Ki blast | `K` | BLAST |
-| Charge ki (hold) | `L` | CHARGE |
-| Beam (hold to charge, release to fire) | `I` | BEAM |
-| Block (hold) | `Shift` | BLOCK |
-| **Transform** (when SURGE is ready) | `T` | auto-prompt in HUD |
-| Start / rematch | `Space` | any button |
+| Action | Keyboard | 🎮 Xbox | Touch |
+|---|---|---|---|
+| Move (**2-axis**: left/right + fly up/down; depth locked) | WASD or Arrow keys | Left stick / D-pad | Left stick |
+| Punch (melee) | `J` | **A** | PUNCH |
+| Ki blast | `K` | **X** | BLAST |
+| Charge ki (hold) | `L` | **LB** / **LT** | CHARGE |
+| Beam (hold to charge, release to fire) | `I` | **RB** / **RT** | BEAM |
+| Block (hold) | `Shift` | **B** | BLOCK |
+| **Transform** (when SURGE is ready) | `T` | **Y** | auto-prompt in HUD |
+| Start / rematch | `Space` | **Start** / **A** | any button |
 
 **Loop:** hold **CHARGE** to fill ki fast; keep charging past a full bar to build **overcharge → SURGE**. With SURGE ready, press **`T`** to **TRANSFORM** into a stronger form (**ASCENDED → SUPER**) — each with its own aura color, bigger damage/speed, and a refilled ki bar that slowly drains while transformed. Spend ki on blasts and beams; close in for free melee; block to cut damage to ~25%. Blasts, beams, and hard **slams** carve craters into the 3D ground.
 
