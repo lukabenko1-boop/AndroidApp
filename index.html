@@ -60,8 +60,10 @@ const CFG={ accel:1750, maxSpd:345, drag:3.2, grav:640, hover:104, altK:5.2,
   meleeDmg:9, blastDmg:11, blockMul:0.26, meleeCd:0.32, blastCd:0.40, meleeRange:112, hitstun:0.22,
   meleeKnock:380, blastKnock:320, blastSpd:660, blastR:14, slamSpd:230, slamK:0.05,
   beamMinCost:24, beamCost:40, beamDps:52, beamDur:0.5, beamThick:17, beamChargeRate:0.85, beamKnock:250, beamRange:1900,
-  tierMul:0.12, surgeMul:0.35 };
-const FORMS=[ {n:'',mul:1,spd:1,drain:0}, {n:'ASCENDED',mul:1.35,spd:1.16,drain:8}, {n:'SUPER',mul:1.7,spd:1.32,drain:14} ];
+  tierMul:0.12, surgeMul:0.35,
+  // LBZ-style power level: damage & knockback scale with powerlevel/2 (like LBZ)
+  powerBase:2.0, powerCap:5.4, powerGain:1.15, powerDecay:0.35, powerMulCap:3.6, wallSlamK:0.04 };
+const FORMS=[ {n:'',spd:1,drain:0,pmul:1}, {n:'ASCENDED',spd:1.16,drain:8,pmul:1.45}, {n:'SUPER',spd:1.32,drain:14,pmul:1.95} ];
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
 
 // ================================================== VEC
@@ -202,10 +204,13 @@ class Fighter{
     this.hp=CFG.hp;this.ki=CFG.ki*.4;this.meleeCd=0;this.blastCd=0;this.hitstun=0;this.charging=false;this.blocking=false;
     this.flash=0;this.aura=0;this.punchAnim=0;this.chargeTime=0;this.tier=0;this.overcharge=0;
     this.form=0;this.formTimer=0;this.transformCd=0;this.faceScreen=this.cpu?-1:1;
-    this.beamState='none';this.beamCharge=0;this.beamTime=0;this.beamPow=0;this.beamCd=0;this._beam=null;}
+    this.beamState='none';this.beamCharge=0;this.beamTime=0;this.beamPow=0;this.beamCd=0;this._beam=null;this.power=CFG.powerBase;}
   get alive(){return this.hp>0;}
   auraColor(){return this.form===2?this.tc2:this.form===1?this.tc1:(this.overcharge>2?'#ffe07a':this.color);}
-  atkMul(){return (1+this.tier*CFG.tierMul+(this.overcharge>2?CFG.surgeMul:0))*FORMS[this.form].mul;}
+  // LBZ power level: rises while charging, multiplied by transformation, drives all damage
+  powerLevel(){return this.power*FORMS[this.form].pmul+(this.overcharge>2?0.6:0);}
+  atkMul(){return clamp(this.powerLevel()/2,1,CFG.powerMulCap);}
+  knockScale(){return 0.6+0.42*this.atkMul();}
   strength(){return (0.6+this.beamPow)*this.atkMul();}
   hurt(dmg,k,blocked){const m=blocked?CFG.blockMul:1;this.hp=Math.max(0,this.hp-dmg*m);
     this.vx+=k[0]*(blocked?.3:1);this.vy+=k[1]*(blocked?.3:1);this.vz+=k[2]*(blocked?.3:1);
@@ -214,17 +219,18 @@ class Fighter{
   dirTo(o){return norm([o.x-this.x,o.y-this.y,o.z-this.z]);}
   dist(o){return Math.hypot(o.x-this.x,o.y-this.y,o.z-this.z);}
   doMelee(o){if(this.meleeCd>0||this.hitstun>0)return;this.meleeCd=CFG.meleeCd;this.punchAnim=.2;SFX.punch();
-    if(this.dist(o)<CFG.meleeRange){const d=this.dirTo(o),K=CFG.meleeKnock;o.hurt(CFG.meleeDmg*this.atkMul(),[d[0]*K,d[1]*K+90,d[2]*K],o.blocking);}}
+    if(this.dist(o)<CFG.meleeRange){const d=this.dirTo(o),K=CFG.meleeKnock*this.knockScale();o.hurt(CFG.meleeDmg*this.atkMul(),[d[0]*K,d[1]*K+90,d[2]*K],o.blocking);}}
   doBlast(o){if(this.blastCd>0||this.hitstun>0||this.ki<CFG.blastCost)return;this.blastCd=CFG.blastCd;this.ki-=CFG.blastCost;
     const su=this.overcharge>2||this.form>0,d=this.dirTo(o),m=this.atkMul();
     projectiles.push({x:this.x+d[0]*(this.r+8),y:this.y+d[1]*(this.r+8),z:this.z+d[2]*(this.r+8),
       vx:d[0]*CFG.blastSpd,vy:d[1]*CFG.blastSpd,vz:d[2]*CFG.blastSpd,r:CFG.blastR*(su?1.5:1),owner:this,life:1.8,
-      c:su?this.auraColor():this.color,dmg:CFG.blastDmg*m,carveR:48*(su?1.6:1)});
+      c:su?this.auraColor():this.color,dmg:CFG.blastDmg*m,knock:CFG.blastKnock*this.knockScale(),carveR:48*(su?1.6:1)});
     if(this.overcharge>2)this.overcharge=Math.max(0,this.overcharge-26);SFX.blast();}
   fireBeam(o){this.beamState='firing';this.beamPow=this.beamCharge;this.beamTime=CFG.beamDur*(.7+this.beamCharge*1.1);
     this.ki=Math.max(0,this.ki-CFG.beamCost*(.4+this.beamCharge*.6));this.beamCd=.6;SFX.beam();shake=Math.max(shake,8);}
   transform(){if(this.form>=2||this.transformCd>0)return;this.form++;this.overcharge=0;this.formTimer=9-this.form*1.5;
-    this.transformCd=.6;this.ki=CFG.ki;carve(this.x,this.z,this.r*3,26);shake=14;flashScreen=.85;
+    this.transformCd=.6;this.ki=CFG.ki;this.power=Math.min(CFG.powerCap,this.power+1.4);   // transform spikes power
+    carve(this.x,this.z,this.r*3,26);shake=14;flashScreen=.85;
     addSparks(this.x,this.y,this.z,26,this.auraColor(),320);SFX.trans();}
 
   control(inp,o,dt){this.charging=false;this.blocking=false;
@@ -241,23 +247,26 @@ class Fighter{
 
   aiThink(o,dt){const ai=this.ai,inp={mx:0,mz:0,charge:false,block:false,beam:false,punchQ:false,blastQ:false,transformQ:false};
     const dx=o.x-this.x,dy=o.y-this.y,dist=this.dist(o),tX=Math.sign(dx)||1,tY=Math.sign(dy)||1;
-    if(this.overcharge>=100&&this.form<2&&Math.random()<.5)inp.transformQ=true;
+    // LBZ-style: fight relative to power level — retreat & power up when outmatched, press when dominant
+    const myP=this.powerLevel(),opP=o.powerLevel(),weak=opP>myP*1.3,strong=myP>opP*1.25;
+    if(this.overcharge>=100&&this.form<2)inp.transformQ=true;   // always cash in a ready transform
     if(ai.chargeT>0){ai.chargeT-=dt;if(dist<160){inp.mx=-tX;inp.mz=0.4;}else{inp.charge=true;inp.mz=0.15;}return inp;}
     if(ai.beamT>0){ai.beamT-=dt;inp.beam=true;inp.mz=Math.abs(dy)>40?tY*0.6:0;if(dist<220)inp.mx=-tX*.5;return inp;}
     for(const p of projectiles){if(p.owner===this)continue;
       if(Math.hypot(p.x-this.x,p.y-this.y)<260&&this.dist(p)<300){inp.mz=(this.y-p.y)>0?1:-1;if(dist<280)inp.block=true;}}
-    if(ai.think<=0){ai.think=.28+Math.random()*.4;ai.jx=(Math.random()*2-1)*.7;const r=Math.random();
-      if(this.ki<CFG.blastCost&&dist>260)ai.mode='charge';
-      else if(this.overcharge<3&&this.ki>72&&r<.22&&dist>240){ai.chargeT=.7+Math.random()*.7;ai.mode='idle';}
-      else if(dist>240&&r<.3&&this.ki>CFG.beamMinCost+12){ai.beamT=.6+Math.random()*.5;ai.mode='idle';}
+    if(ai.think<=0){ai.think=(strong?.2:.3)+Math.random()*.35;ai.jx=(Math.random()*2-1)*.7;const r=Math.random();
+      if(this.ki<CFG.blastCost&&dist>240)ai.mode='charge';
+      else if(weak&&this.ki>58&&r<.5&&dist>180){ai.chargeT=.8+Math.random()*.9;ai.mode='idle';}   // outmatched: power up
+      else if(!strong&&this.overcharge<3&&this.ki>72&&r<.22&&dist>240){ai.chargeT=.7+Math.random()*.7;ai.mode='idle';}
+      else if(dist>240&&r<(strong?.42:.3)&&this.ki>CFG.beamMinCost+12){ai.beamT=.6+Math.random()*.5;ai.mode='idle';}
       else if(dist>420)ai.mode=r<.6?'approach':'blast';
-      else if(dist<140)ai.mode=r<.7?'melee':'reposition';
+      else if(dist<140)ai.mode=(strong?r<.85:r<.6)?'melee':'reposition';
       else ai.mode=r<.5?'blast':'approach';}
     switch(ai.mode){
       case 'charge':inp.charge=this.ki<CFG.ki*.9;inp.mz=0.2;if(dist<190){inp.mx=-tX;inp.charge=false;}break;
       case 'approach':inp.mx=tX;inp.mz=Math.abs(dy)>30?tY:0.2;break;
       case 'blast':inp.mx=dist<280?-tX*.5:ai.jx;inp.mz=Math.abs(dy)>26?tY:0.15;if(this.blastCd<=0&&Math.random()<.5)inp.blastQ=true;break;
-      case 'melee':inp.mx=tX;inp.mz=Math.abs(dy)>20?tY:0.2;if(dist<CFG.meleeRange&&this.meleeCd<=0)inp.punchQ=true;if(Math.random()<.15)inp.block=true;break;
+      case 'melee':inp.mx=tX;inp.mz=Math.abs(dy)>20?tY:0.2;if(dist<CFG.meleeRange&&this.meleeCd<=0)inp.punchQ=true;if(Math.random()<(strong?.1:.22))inp.block=true;break;
       case 'reposition':inp.mx=-tX+ai.jx;inp.mz=0.3;break;}
     return inp;}
 
@@ -268,26 +277,30 @@ class Fighter{
     this.control(inp,o,dt);
     if(this.charging){this.chargeTime+=dt;this.tier=this.chargeTime>2.8?3:this.chargeTime>1.4?2:this.chargeTime>.5?1:0;
       this.ki+=CFG.chargeRate*dt;if(this.ki>=CFG.ki){this.ki=CFG.ki;this.overcharge=Math.min(100,this.overcharge+CFG.ocRate*dt);}
+      this.power=Math.min(CFG.powerCap,this.power+CFG.powerGain*dt);   // charging raises power level
       this.aura=Math.min(1,this.aura+dt*4);
       if(Math.random()<.4)addSparks(this.x,this.y-8,this.z,1,this.auraColor(),80);if(Math.random()<.05)SFX.charge();
       if(this.tier>=2){const dd=this.dirTo(o),D=this.dist(o);if(D<190){o.vx-=dd[0]*220*dt;o.vy-=dd[1]*220*dt;o.vz-=dd[2]*220*dt;}}
       if(this.tier>=3)shake=Math.max(shake,3);
     }else{this.chargeTime=0;this.tier=0;this.ki=Math.min(CFG.ki,this.ki+CFG.regen*dt);
+      this.power=Math.max(CFG.powerBase,this.power-CFG.powerDecay*dt);   // power bleeds back down
       this.overcharge=Math.max(0,this.overcharge-CFG.ocDecay*dt);this.aura=Math.max(0,this.aura-dt*3);}
     if(this.form>0){this.formTimer-=dt;this.ki=Math.max(0,this.ki-FORMS[this.form].drain*dt);
       if(this.formTimer<=0||this.ki<=0){this.form=0;addSparks(this.x,this.y,this.z,10,'#ffffff',160);}}
-    // two-axis flight: X (left/right) + Y (altitude), depth Z locked to the plane
-    const dr=Math.exp(-CFG.drag*dt);this.vx*=dr;this.vy*=dr;
+    // LBZ-style momentum: knockback carries (less drag while stunned) and bounces off walls/ground
+    const dr=Math.exp(-(this.hitstun>0?CFG.drag*0.4:CFG.drag)*dt);this.vx*=dr;this.vy*=dr;
     this.vy-=CFG.grav*dt;
-    const hs=Math.hypot(this.vx,this.vy),mx=CFG.maxSpd*FORMS[this.form].spd;if(hs>mx){this.vx*=mx/hs;this.vy*=mx/hs;}
+    const capSpd=(CFG.maxSpd+(this.hitstun>0?520:0))*FORMS[this.form].spd,hs=Math.hypot(this.vx,this.vy);if(hs>capSpd){this.vx*=capSpd/hs;this.vy*=capSpd/hs;}
     this.vz=0;this.z=PLANE_Z;
     const gy=heightAt(this.x,PLANE_Z);
     this.x+=this.vx*dt;this.y+=this.vy*dt;
-    if(this.x<AX0+this.r){this.x=AX0+this.r;this.vx*=-.4;}if(this.x>AX1-this.r){this.x=AX1-this.r;this.vx*=-.4;}
-    if(this.y>YMAX){this.y=YMAX;this.vy*=-.3;}
+    // wall slam (take damage + bounce when hurled into a wall)
+    if(this.x<AX0+this.r){this.x=AX0+this.r;if(this.vx<-CFG.slamSpd){this.hp=Math.max(0,this.hp-(-this.vx-CFG.slamSpd)*CFG.wallSlamK);SFX.boom();shake=Math.max(shake,6);addSparks(this.x,this.y,this.z,8,'#ffd27a',200);}this.vx*=-.5;}
+    if(this.x>AX1-this.r){this.x=AX1-this.r;if(this.vx>CFG.slamSpd){this.hp=Math.max(0,this.hp-(this.vx-CFG.slamSpd)*CFG.wallSlamK);SFX.boom();shake=Math.max(shake,6);addSparks(this.x,this.y,this.z,8,'#ffd27a',200);}this.vx*=-.5;}
+    if(this.y>YMAX){this.y=YMAX;this.vy*=-.4;}
     if(this.y<gy+this.r){const imp=-this.vy;this.y=gy+this.r;
-      if(imp>CFG.slamSpd){carve(this.x,PLANE_Z,this.r*1.9,24);this.hp=Math.max(0,this.hp-(imp-CFG.slamSpd)*CFG.slamK);this.vy=imp*.42;SFX.boom();shake=Math.max(shake,7);}
-      else this.vy=Math.abs(this.vy)*.3;this.vx*=.85;}
+      if(imp>CFG.slamSpd){carve(this.x,PLANE_Z,this.r*1.9,24);this.hp=Math.max(0,this.hp-(imp-CFG.slamSpd)*CFG.slamK);this.vy=imp*.5;this.vx*=.7;SFX.boom();shake=Math.max(shake,7);addSparks(this.x,this.y,this.z,8,'#ffd27a',200);}
+      else{this.vy=Math.abs(this.vy)*.3;this.vx*=.85;}}
     const me=project(this.x,this.y,this.z),op=project(o.x,o.y,o.z);if(me&&op)this.faceScreen=op.sx>=me.sx?1:-1;}
 
   pushScene(scene){const p=project(this.x,this.y,this.z);if(!p)return;
@@ -354,7 +367,7 @@ function resolveBeams(dt){for(const f of [P1,P2]){if(f.beamState!=='firing'){f._
     const fs=f.strength(),os=o.strength();if(fs>os*1.25)o.hp=Math.max(0,o.hp-CFG.beamDps*.3*dt);}
   else{const rel=sub([o.x,o.y,o.z],m);let t=clamp(dot(rel,d),0,L);const cp=[m[0]+d[0]*t,m[1]+d[1]*t,m[2]+d[2]*t];
     if(Math.hypot(o.x-cp[0],o.y-cp[1],o.z-cp[2])<th+o.r){const dmg=CFG.beamDps*(.6+f.beamPow)*f.atkMul()*dt;o.hp=Math.max(0,o.hp-dmg*(o.blocking?CFG.blockMul:1));
-      o.vx+=d[0]*CFG.beamKnock*dt;o.vy+=d[1]*CFG.beamKnock*dt+20*dt;o.vz+=d[2]*CFG.beamKnock*dt;o.hitstun=Math.max(o.hitstun,.05);o.flash=.08;
+      const bk=CFG.beamKnock*f.knockScale();o.vx+=d[0]*bk*dt;o.vy+=d[1]*bk*dt+20*dt;o.vz+=d[2]*bk*dt;o.hitstun=Math.max(o.hitstun,.05);o.flash=.08;
       if(Math.random()<.6)addSparks(o.x,o.y,o.z,3,f.c,200);shake=Math.max(shake,5);}}
   f.vx-=d[0]*80*dt;f.vz-=d[2]*80*dt;}}
 
@@ -368,7 +381,7 @@ function stepProjectiles(dt){for(const p of projectiles){p.life-=dt;p.x+=p.vx*dt
   if(p.x<AX0||p.x>AX1||p.z<AZ0||p.z>AZ1){p.life=0;addSparks(p.x,p.y,p.z,6,p.c,160);continue;}
   if(p.y<heightAt(p.x,p.z)){p.life=0;carve(p.x,p.z,p.carveR,22);addSparks(p.x,p.y,p.z,10,p.c,200);SFX.boom();continue;}
   const t=p.owner===P1?P2:P1;if(Math.hypot(t.x-p.x,t.y-p.y,t.z-p.z)<t.r+p.r){
-    t.hurt(p.dmg,[p.vx/CFG.blastSpd*CFG.blastKnock,40,p.vz/CFG.blastSpd*CFG.blastKnock],t.blocking);p.life=0;addSparks(p.x,p.y,p.z,12,p.c,240);}}
+    const kn=p.knock||CFG.blastKnock;t.hurt(p.dmg,[p.vx/CFG.blastSpd*kn,40,p.vz/CFG.blastSpd*kn],t.blocking);p.life=0;addSparks(p.x,p.y,p.z,12,p.c,240);}}
   projectiles=projectiles.filter(p=>p.life>0);}
 function stepSparks(dt){for(const s of sparks){s.t+=dt;s.vy-=460*dt;s.x+=s.vx*dt;s.y+=s.vy*dt;s.z+=s.vz*dt;}
   sparks=sparks.filter(s=>s.t<s.life);if(sparks.length>560)sparks.splice(0,sparks.length-560);}
@@ -444,9 +457,11 @@ function hud(){bar(24,26,300,22,P1.hp/CFG.hp,'#5fe08a','#2fae5a',false);bar(24,5
   if(P2.overcharge>2)bar(W-264,65,240,6,P2.overcharge/100,'#ffe07a','#f0a020',true);
   ctx.font='700 15px ui-monospace,monospace';ctx.textBaseline='alphabetic';ctx.fillStyle='#eaf0ff';ctx.textAlign='left';ctx.fillText(P1.name,24,20);
   ctx.textAlign='right';ctx.fillText(P2.name,W-24,20);ctx.textAlign='left';
-  for(const[f,sd] of [[P1,'L'],[P2,'R']]){let lbl='',cl='#9fd0ff';
+  for(const[f,sd] of [[P1,'L'],[P2,'R']]){let lbl='',cl='#9fd0ff';const X=sd==='L'?24:W-24;ctx.textAlign=sd==='L'?'left':'right';
     if(f.form>0){lbl=FORMS[f.form].n;cl=f.auraColor();}else if(f.overcharge>=100){lbl='TRANSFORM! (T)';cl='#ffe07a';}else if(f.overcharge>2){lbl='SURGE';cl='#ffe07a';}else if(f.tier>0){lbl='CHARGE '+f.tier;}
-    if(lbl){ctx.textAlign=sd==='L'?'left':'right';ctx.font='700 12px ui-monospace,monospace';ctx.fillStyle=cl;ctx.fillText(lbl,sd==='L'?24:W-24,88);ctx.textAlign='left';}}}
+    if(lbl){ctx.font='700 12px ui-monospace,monospace';ctx.fillStyle=cl;ctx.fillText(lbl,X,88);}
+    // LBZ scouter-style power readout
+    ctx.font='700 12px ui-monospace,monospace';ctx.fillStyle=f.powerLevel()>3.4?'#ffc07a':'#8fb0d8';ctx.fillText('PWR '+Math.round(f.powerLevel()*1000),X,104);ctx.textAlign='left';}}
 
 function render(){buildCam();const v=vp();ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,cv.width,cv.height);
   ctx.save();ctx.translate(v.ox,v.oy);ctx.scale(v.s,v.s);ctx.beginPath();ctx.rect(0,0,W,H);ctx.clip();

@@ -48,12 +48,19 @@ Two-axis movement: steer left/right and fly up/down (depth is locked to a plane,
 - Melee with knockback, ki-blast projectiles (3D travel + terrain/target collision), and a **chargeable 3D beam** that melts terrain, knocks back, and **clashes** when two beams meet head-on
 - Blocking with directional damage reduction
 
+**Power level (LBZ-style)**
+- Every fighter has a **power level** that rises while you **charge**, spikes on **transform**, and bleeds back down otherwise — with a live **scouter-style `PWR ####` readout** on the HUD
+- **All damage and knockback scale with `powerlevel / 2`** — the exact rule from Lemming Ball Z's engine (`DAMAGEOPTION_HALF_POWERLEVEL_MOD`). Out-power your rival and your hits hurt more and launch farther
+
 **Charging & transformations**
 - Fast ki charge with escalating **power tiers** (aura, rings, tier-3 lightning) → **overcharge / SURGE**
-- **Named transformations** — Base → **ASCENDED** → **SUPER** — each with its own **per-tier aura color** (mirroring LBZ's `Aura_Color_Normal / Transformed / Transformed2`), a damage + speed multiplier folded into a **power-level-style damage model** (`atkMul`), and a timed duration that drains ki
+- **Named transformations** — Base → **ASCENDED** → **SUPER** — each with its own **per-tier aura color** (mirroring LBZ's `Aura_Color_Normal / Transformed / Transformed2`), a **power-level multiplier**, and a timed duration that drains ki
+
+**Physics (LBZ-style momentum)**
+- Knockback **carries** (drag drops while you're stunned) and **bounces off walls and ground**; being hurled into a wall or slammed into the terrain deals extra damage and craters it — harder hits from higher-power attackers send you flying
 
 **Rest**
-- FSM **AI rival** that approaches, blasts, melees, charges, transforms, fires beams, and dodges
+- **Power-aware FSM AI** that reads the power gap: it **retreats to charge and transform when out-powered**, and presses melee/beam pressure when it's the stronger fighter — plus blasts, dodges, and beam play
 - Health + ki + overcharge HUD with tier / SURGE / form readout, round intro, K.O. flow, instant rematch
 - Juice: hit sparks, screen shake, transform flash, procedural WebAudio SFX (punch, blast, beam, boom, transform)
 - Dusk arena: gradient sky, sun, stars
