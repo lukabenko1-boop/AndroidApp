@@ -57,7 +57,8 @@ func _physics_process(delta: float) -> void:
 		return
 	if is_instance_valid(target_fig) and position.distance_to(target_fig.global_position) < rad + 1.4:
 		if target_fig.has_method("hurt"):
-			var kb := vel.normalized() * 16.0 + Vector3.UP * 3.0
+			var ks : float = owner_fig.knock_scale() if is_instance_valid(owner_fig) else 1.0
+			var kb := vel.normalized() * (16.0 * ks) + Vector3.UP * 3.0
 			target_fig.hurt(dmg, kb, target_fig.blocking)
 		queue_free()
 

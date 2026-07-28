@@ -42,11 +42,18 @@ const BEAM_RANGE := 110.0
 const RADIUS := 1.4
 const TIER_MUL := 0.12
 const SURGE_MUL := 0.35
+# LBZ-style power level: damage & knockback scale with powerlevel/2
+const POWER_BASE := 2.0
+const POWER_CAP := 5.4
+const POWER_GAIN := 1.15
+const POWER_DECAY := 0.35
+const POWER_MUL_CAP := 3.6
+const WALL_SLAM_K := 0.9
 
 const FORMS := [
-	{"n": "", "mul": 1.0, "spd": 1.0, "drain": 0.0},
-	{"n": "ASCENDED", "mul": 1.35, "spd": 1.16, "drain": 8.0},
-	{"n": "SUPER", "mul": 1.7, "spd": 1.32, "drain": 14.0},
+	{"n": "", "spd": 1.0, "drain": 0.0, "pmul": 1.0},
+	{"n": "ASCENDED", "spd": 1.16, "drain": 8.0, "pmul": 1.45},
+	{"n": "SUPER", "spd": 1.32, "drain": 14.0, "pmul": 1.95},
 ]
 
 # identity
@@ -74,6 +81,7 @@ var blocking := false
 var charge_time := 0.0
 var tier := 0
 var overcharge := 0.0
+var power := POWER_BASE
 var form := 0
 var form_timer := 0.0
 var beam_state := "none"   # none / charging / firing
@@ -120,8 +128,14 @@ func aura_color() -> Color:
 	if overcharge > 2.0: return Color(1.0, 0.88, 0.44)
 	return base_color
 
+func power_level() -> float:
+	return power * FORMS[form].pmul + (0.6 if overcharge > 2.0 else 0.0)
+
 func atk_mul() -> float:
-	return (1.0 + tier * TIER_MUL + (SURGE_MUL if overcharge > 2.0 else 0.0)) * FORMS[form].mul
+	return clampf(power_level() / 2.0, 1.0, POWER_MUL_CAP)
+
+func knock_scale() -> float:
+	return 0.6 + 0.42 * atk_mul()
 
 func strength() -> float:
 	return (0.6 + beam_pow) * atk_mul()
@@ -242,6 +256,7 @@ func reset(pos: Vector3, face_cpu: bool) -> void:
 	hitstun = 0.0; flash = 0.0; punch_anim = 0.0
 	charging = false; blocking = false; charge_time = 0.0; tier = 0; overcharge = 0.0
 	form = 0; form_timer = 0.0
+	power = POWER_BASE
 	beam_state = "none"; beam_charge = 0.0; beam_time = 0.0; beam_pow = 0.0
 
 func dir_to(o: Fighter) -> Vector3:
@@ -262,7 +277,7 @@ func do_melee(o: Fighter) -> void:
 	punch_anim = 0.2
 	if global_position.distance_to(o.global_position) < MELEE_RANGE:
 		var d := dir_to(o)
-		o.hurt(MELEE_DMG * atk_mul(), d * MELEE_KNOCK + Vector3.UP * 5.0, o.blocking)
+		o.hurt(MELEE_DMG * atk_mul(), d * (MELEE_KNOCK * knock_scale()) + Vector3.UP * 5.0, o.blocking)
 
 func do_blast(o: Fighter) -> void:
 	if blast_cd > 0.0 or hitstun > 0.0 or ki < BLAST_COST: return
@@ -291,6 +306,7 @@ func try_transform() -> void:
 	form_timer = 9.0 - form * 1.5
 	transform_cd = 0.6
 	ki = KI_MAX
+	power = minf(POWER_CAP, power + 1.4)   # transform spikes power level
 	terrain.carve(global_position.x, global_position.z, RADIUS * 3.0, 1.5)
 	if game.has_method("on_transform"):
 		game.on_transform(self)
@@ -344,6 +360,7 @@ func tick(delta: float, inp: Dictionary, o: Fighter) -> void:
 		if ki >= KI_MAX:
 			ki = KI_MAX
 			overcharge = minf(100.0, overcharge + OC_RATE * delta)
+		power = minf(POWER_CAP, power + POWER_GAIN * delta)   # charging raises power level
 		if tier >= 2:
 			var dd := dir_to(o)
 			if global_position.distance_to(o.global_position) < 12.0:
@@ -352,6 +369,7 @@ func tick(delta: float, inp: Dictionary, o: Fighter) -> void:
 		charge_time = 0.0
 		tier = 0
 		ki = minf(KI_MAX, ki + REGEN * delta)
+		power = maxf(POWER_BASE, power - POWER_DECAY * delta)   # power bleeds back down
 		overcharge = maxf(0.0, overcharge - OC_DECAY * delta)
 	# form drain
 	if form > 0:
@@ -359,13 +377,13 @@ func tick(delta: float, inp: Dictionary, o: Fighter) -> void:
 		ki = maxf(0.0, ki - FORMS[form].drain * delta)
 		if form_timer <= 0.0 or ki <= 0.0:
 			form = 0
-	# physics: two-axis flight (X + altitude Y) with gravity, depth Z locked to the plane
-	var dr : float = exp(-DRAG * delta)
+	# physics: two-axis flight (X + altitude Y); LBZ momentum — knockback carries while stunned
+	var dr : float = exp(-(DRAG * 0.4 if hitstun > 0.0 else DRAG) * delta)
 	vel.x *= dr
 	vel.y *= dr
 	vel.y -= GRAV * delta
 	var hs := Vector2(vel.x, vel.y).length()
-	var mx : float = MAXSPD * FORMS[form].spd
+	var mx : float = (MAXSPD + (30.0 if hitstun > 0.0 else 0.0)) * FORMS[form].spd
 	if hs > mx:
 		vel.x *= mx / hs
 		vel.y *= mx / hs
@@ -374,8 +392,15 @@ func tick(delta: float, inp: Dictionary, o: Fighter) -> void:
 	var gy := terrain.height_at(global_position.x, PLANE_Z)
 	global_position.x += vel.x * delta
 	global_position.y += vel.y * delta
-	# bounds
-	global_position.x = clampf(global_position.x, terrain.AX0 + RADIUS, terrain.AX1 - RADIUS)
+	# bounds — wall slam takes damage + bounce
+	if global_position.x < terrain.AX0 + RADIUS:
+		global_position.x = terrain.AX0 + RADIUS
+		if vel.x < -SLAM_SPD: hp = maxf(0.0, hp - (-vel.x - SLAM_SPD) * WALL_SLAM_K)
+		vel.x *= -0.5
+	elif global_position.x > terrain.AX1 - RADIUS:
+		global_position.x = terrain.AX1 - RADIUS
+		if vel.x > SLAM_SPD: hp = maxf(0.0, hp - (vel.x - SLAM_SPD) * WALL_SLAM_K)
+		vel.x *= -0.5
 	if global_position.y > 46.0:
 		global_position.y = 46.0
 		vel.y = -absf(vel.y) * 0.3
@@ -485,9 +510,13 @@ func ai_input(o: Fighter, delta: float) -> Dictionary:
 	var dist := global_position.distance_to(o.global_position)
 	var tX : float = signf(dx) if dx != 0.0 else 1.0
 	var tY : float = signf(dy) if dy != 0.0 else 1.0
-	# second axis (mz) now drives altitude; bias upward so the AI holds height vs gravity
-	if overcharge >= 100.0 and form < 2 and randf() < 0.5:
-		inp.transform = true
+	# LBZ-style: fight relative to power level. Second axis (mz) drives altitude.
+	var my_p := power_level()
+	var op_p := o.power_level()
+	var weak := op_p > my_p * 1.3
+	var strong := my_p > op_p * 1.25
+	if overcharge >= 100.0 and form < 2:
+		inp.transform = true   # always cash in a ready transform
 	if _ai_charge_t > 0.0:
 		_ai_charge_t -= delta
 		if dist < 14.0: inp.mx = -tX; inp.mz = 0.4
@@ -500,16 +529,18 @@ func ai_input(o: Fighter, delta: float) -> Dictionary:
 		if dist < 18.0: inp.mx = -tX * 0.5
 		return inp
 	if _ai_think <= 0.0:
-		_ai_think = 0.28 + randf() * 0.4
+		_ai_think = (0.2 if strong else 0.3) + randf() * 0.35
 		_ai_jx = (randf() * 2.0 - 1.0) * 0.7
 		var r := randf()
 		if ki < BLAST_COST and dist > 22.0: _ai_mode = "charge"
-		elif overcharge < 3.0 and ki > 72.0 and r < 0.22 and dist > 20.0:
+		elif weak and ki > 58.0 and r < 0.5 and dist > 16.0:
+			_ai_charge_t = 0.8 + randf() * 0.9; _ai_mode = "idle"   # out-powered: retreat & power up
+		elif not strong and overcharge < 3.0 and ki > 72.0 and r < 0.22 and dist > 20.0:
 			_ai_charge_t = 0.7 + randf() * 0.7; _ai_mode = "idle"
-		elif dist > 20.0 and r < 0.3 and ki > BEAM_MIN + 12.0:
+		elif dist > 20.0 and r < (0.42 if strong else 0.3) and ki > BEAM_MIN + 12.0:
 			_ai_beam_t = 0.6 + randf() * 0.5; _ai_mode = "idle"
 		elif dist > 34.0: _ai_mode = "approach" if r < 0.6 else "blast"
-		elif dist < 11.0: _ai_mode = "melee" if r < 0.7 else "reposition"
+		elif dist < 11.0: _ai_mode = ("melee" if r < 0.85 else "reposition") if strong else ("melee" if r < 0.6 else "reposition")
 		else: _ai_mode = "blast" if r < 0.5 else "approach"
 	match _ai_mode:
 		"charge":

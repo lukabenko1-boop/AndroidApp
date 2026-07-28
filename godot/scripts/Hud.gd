@@ -64,6 +64,9 @@ func _form_label(f: Fighter, x: float, right: bool) -> void:
 		lbl = "SURGE"; col = Color(1, 0.88, 0.44)
 	elif f.tier > 0:
 		lbl = "CHARGE %d" % f.tier
+	var al := HORIZONTAL_ALIGNMENT_RIGHT if right else HORIZONTAL_ALIGNMENT_LEFT
 	if lbl != "":
-		var al := HORIZONTAL_ALIGNMENT_RIGHT if right else HORIZONTAL_ALIGNMENT_LEFT
 		draw_string(font, Vector2(x, 88), lbl, al, 176 if right else -1, 13, col)
+	# LBZ scouter-style power readout
+	var pcol := Color(1, 0.75, 0.48) if f.power_level() > 3.4 else Color(0.56, 0.69, 0.85)
+	draw_string(font, Vector2(x, 104), "PWR %d" % int(round(f.power_level() * 1000.0)), al, 176 if right else -1, 13, pcol)
