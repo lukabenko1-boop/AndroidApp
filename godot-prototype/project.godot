@@ -1,0 +1,21 @@
+; KI BLOBS — first 3D prototype.
+; Open this folder in Godot 4.3+ (Project Manager -> Import -> select project.godot), then press F5.
+
+config_version=5
+
+[application]
+
+config/name="KI Blobs — 3D Prototype"
+run/main_scene="res://Proto.tscn"
+config/features=PackedStringArray("4.3", "GL Compatibility")
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/stretch/mode="canvas_items"
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"

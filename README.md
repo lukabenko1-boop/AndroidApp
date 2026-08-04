@@ -1,58 +1,88 @@
-# KI BLOBS — Aerial Brawl
+# KI BLOBS 3D — Aerial Brawl
 
-A playable prototype of a **2D aerial fighting game** in the *Lemming Ball Z* / Dragon-Ball-Z-arena-fighter tradition: two round "blobs" fly freely around an arena, trade melee blows up close, **charge ki**, fire **energy blasts**, and **block** — first to drain the other's health wins.
+A playable **2.5D aerial fighting game** in the *Lemming Ball Z* / Dragon-Ball-Z-arena tradition: two **stick-figure fighters** duel in a **3D world but on a locked 2D plane** (move left/right + fly up/down, depth fixed — exactly like Lemming Ball Z). They trade melee blows, **charge ki**, **transform** into more powerful forms, fire **energy blasts and beams**, and **block** — first to drain the other's health wins.
 
-It's an **original** take (original name, art, and code) so it stays clear of the *Lemmings* and *Dragon Ball* trademarks. Everything is drawn procedurally on an HTML5 canvas — no external assets — so the whole game is a single self-contained file.
+It's an **original** take (original name, art, and code) so it stays clear of the *Lemmings* and *Dragon Ball* trademarks. The whole thing is a **single self-contained HTML file** with a hand-written **software-3D engine** on a 2D canvas — no external libraries, no WebGL, no build step — so it runs anywhere, including inside a sandboxed page.
+
+## Two versions in this repo
+
+- **`index.html`** — the **web prototype** (guaranteed-runnable, software 3D). Open it in any browser.
+- **`godot/`** — a native **Godot 4** port for **real GPU 3D + an Android APK** (lit meshes, shadows, procedural sky, destructible heightmap terrain). See [`godot/README.md`](godot/README.md) to open, run, and export. *Note: it's an author-reviewed scaffold that hasn't been opened in the editor yet (the Godot binary couldn't be fetched in the build sandbox), so expect minor first-run tuning.*
 
 ## Play
 
-Open `index.html` in any modern browser (desktop or mobile). No build step, no dependencies.
+Open `index.html` in any modern browser (desktop or mobile). No dependencies.
 
-- **Desktop:** just double-click the file, or serve the folder: `python3 -m http.server` then visit `http://localhost:8000`.
-- **Phone:** open the same URL on your phone's browser — on-screen touch controls appear automatically.
+- **Desktop:** double-click the file, or serve the folder: `python3 -m http.server` then visit `http://localhost:8000`.
+- **Phone:** open the same URL — on-screen touch controls appear automatically.
 
 ## Controls
 
-| Action | Keyboard | Touch |
-|---|---|---|
-| Fly / move | WASD or Arrow keys | Left stick |
-| Punch (melee) | `J` | PUNCH |
-| Ki blast (costs ki) | `K` | BLAST |
-| Charge ki (hold) | `L` | CHARGE |
-| Block (hold) | `Shift` | BLOCK |
-| Start / rematch | `Space` | any button |
+Two-axis movement: steer left/right and fly up/down (depth is locked to a plane, LBZ-style). **Xbox-style controllers are supported** — just plug one in.
 
-**Loop:** you regain a little ki over time, but **hold CHARGE** to refill it fast (you're nearly stationary and vulnerable while doing so). Spend ki on blasts; close the distance for free melee damage; block to cut incoming damage to ~25% — but only when you're facing the attack.
+| Action | Keyboard | 🎮 Xbox | Touch |
+|---|---|---|---|
+| Move (**2-axis**: left/right + fly up/down; depth locked) | WASD or Arrow keys | Left stick / D-pad | Left stick |
+| Punch (melee) | `J` | **A** | PUNCH |
+| Ki blast | `K` | **X** | BLAST |
+| Charge ki (hold) | `L` | **LB** / **LT** | CHARGE |
+| Beam (hold to charge, release to fire) | `I` | **RB** / **RT** | BEAM |
+| Block (hold) | `Shift` | **B** | BLOCK |
+| **Transform** (when SURGE is ready) | `T` | **Y** | auto-prompt in HUD |
+| Start / rematch | `Space` | **Start** / **A** | any button |
+
+**Loop:** hold **CHARGE** to fill ki fast; keep charging past a full bar to build **overcharge → SURGE**. With SURGE ready, press **`T`** to **TRANSFORM** into a stronger form (**ASCENDED → SUPER**) — each with its own aura color, bigger damage/speed, and a refilled ki bar that slowly drains while transformed. Spend ki on blasts and beams; close in for free melee; block to cut damage to ~25%. Blasts, beams, and hard **slams** carve craters into the 3D ground.
 
 ## What's implemented
 
-- Free 8-direction flight with acceleration/friction and arena bounds
-- Melee with knockback + a short punch animation
-- Ki system: cost, fast charge, passive regen, ki bar
-- Ki-blast projectiles with trails, wall collisions, and hit detection
-- Blocking (directional damage reduction) with a shield visual
-- A finite-state-machine **AI rival** (approach / blast / melee / charge / dodge / block)
-- Health + ki HUD, round-start intro, K.O. / win-lose screen, instant rematch
-- Juice: hit sparks, screen shake, charging aura + rings, procedural WebAudio SFX
-- Dusk arena background (gradient sky, sun, parallax-style mountains, stars)
+**3D engine (software, on canvas)**
+- Perspective camera (lookAt) that **follows the midpoint and auto-zooms** to the fighters' separation, with smoothing
+- Painter's-algorithm depth sorting + **frustum culling** across terrain, fighters, beams, projectiles, and particles — a **large arena** (~1640 × 1480 units) stays at 60fps
+- **Textured, lit, 3D destructible heightmap terrain** — height-banded palette (dirt → grass → rock), directional lighting, slope rock, per-quad variation, and **scorched crater rings**; blasts, beams, and slams carve real craters in the X/Z plane with flying dirt
+- **Animated stick-figure fighters** — head, spine, and stick limbs with distinct poses for idle, fly, move, punch, charge, beam, block, and hit, plus form-colored spiky hair
+- **Lemming-Ball-Z-style 2.5D**: fighters are locked to a single depth plane and move on two axes (left/right + altitude) with gravity, while the world renders in full 3D behind them via a front-facing follow-and-zoom camera
+- Shadows projected onto the terrain for grounding
+
+**Combat**
+- Full-3D flight with momentum, drag, auto-hover altitude, wall/ceiling bounds, and **slam impacts** (crater + bonus damage + bounce)
+- Melee with knockback, ki-blast projectiles (3D travel + terrain/target collision), and a **chargeable 3D beam** that melts terrain, knocks back, and **clashes** when two beams meet head-on
+- Blocking with directional damage reduction
+
+**Power level (LBZ-style)**
+- Every fighter has a **power level** that rises while you **charge**, spikes on **transform**, and bleeds back down otherwise — with a live **scouter-style `PWR ####` readout** on the HUD
+- **All damage and knockback scale with `powerlevel / 2`** — the exact rule from Lemming Ball Z's engine (`DAMAGEOPTION_HALF_POWERLEVEL_MOD`). Out-power your rival and your hits hurt more and launch farther
+
+**Charging & transformations**
+- Fast ki charge with escalating **power tiers** (aura, rings, tier-3 lightning) → **overcharge / SURGE**
+- **Named transformations** — Base → **ASCENDED** → **SUPER** — each with its own **per-tier aura color** (mirroring LBZ's `Aura_Color_Normal / Transformed / Transformed2`), a **power-level multiplier**, and a timed duration that drains ki
+
+**Physics (LBZ-style momentum)**
+- Knockback **carries** (drag drops while you're stunned) and **bounces off walls and ground**; being hurled into a wall or slammed into the terrain deals extra damage and craters it — harder hits from higher-power attackers send you flying
+
+**Rest**
+- **Power-aware FSM AI** that reads the power gap: it **retreats to charge and transform when out-powered**, and presses melee/beam pressure when it's the stronger fighter — plus blasts, dodges, and beam play
+- Health + ki + overcharge HUD with tier / SURGE / form readout, round intro, K.O. flow, instant rematch
+- Juice: hit sparks, screen shake, transform flash, procedural WebAudio SFX (punch, blast, beam, boom, transform)
+- Dusk arena: gradient sky, sun, stars
+
+## Reference
+
+Design cues were taken from the actual **Lemming Ball Z ALPHA** (build 8581) launcher binaries — a custom C++ "cb9" engine (SDL2 + OpenGL + FMOD, MD5 models, heightmap 3D levels, LGS-scripted moves). We use it as **design reference only** — none of its assets or code are included; KI BLOBS is entirely original.
 
 ## Roadmap → native Android
 
-This web build proves the mechanics and *feel*. Two paths to a real Android app:
-
-1. **Fastest APK (reuse this code):** wrap the web build with **Capacitor** or ship it as a **Trusted Web Activity (TWA)** via Bubblewrap. The game already has touch controls and a mobile viewport, so it runs as-is inside a WebView.
-2. **Native game engine (recommended for a polished title):** port the mechanics to **Godot 4** — free, excellent 2D, one-click Android/APK export. The systems here (fighter state, ki, projectiles, AI FSM) map cleanly onto Godot nodes and GDScript.
+The web build proves the mechanics and feel. Two paths to a real Android app:
+1. **Fastest APK:** wrap this build with **Capacitor** or a **TWA** (Bubblewrap) — it already has touch controls + a mobile viewport.
+2. **Recommended:** port to **Godot 4** (free, great 3D, one-click APK export). The systems here (fighter state, ki, forms, projectiles, beams, AI, destructible terrain) map cleanly onto Godot nodes and GDScript.
 
 ### Likely next features
-- Sprite/animation art pass (idle, fly, punch, charge, hit, KO)
-- Energy **beam** attack + beam-struggle mechanic
-- Transformations (spend ki for a temporary power/aura boost)
-- Dash / teleport (double-tap or dedicated button)
-- Character roster + simple move variations
-- Round system (best of 3), pause menu, settings, haptics
-- Difficulty levels for the AI; optional local 2-player
+- Sprite/model art pass; a real camera that orbits and frames the action
+- Manual altitude control + dash / teleport
+- Full beam-clash mini-game (steer/mash to overpower)
+- Data/script-driven moves (à la LBZ's LGS) so moves become editable content
+- Round system (best of 3), pause menu, settings, haptics, difficulty levels, local 2-player
 
 ## Files
 
-- `index.html` — the entire game (canvas + game loop + input + AI + audio)
+- `index.html` — the entire game (software-3D engine + game loop + input + AI + audio)
 - `README.md` — this file
