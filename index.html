@@ -76,9 +76,15 @@ const lerp=(a,b,t)=>a+(b-a)*t;
 
 // ================================================== CANVAS
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
-function resize(){const r=document.getElementById('wrap').getBoundingClientRect();const d=Math.min(window.devicePixelRatio||1,2);
-  cv.width=Math.round(r.width*d);cv.height=Math.round(r.height*d);}
-window.addEventListener('resize',resize);resize();
+function resize(){const wrap=document.getElementById('wrap');const r=wrap.getBoundingClientRect();const d=Math.min(window.devicePixelRatio||1,2);
+  // fall back to window/inner size if the wrapper hasn't been laid out yet (preview panels can mount at 0x0)
+  const rw=r.width||window.innerWidth||W,rh=r.height||window.innerHeight||H;
+  const w=Math.max(1,Math.round(rw*d)),h=Math.max(1,Math.round(rh*d));
+  if(w!==cv.width||h!==cv.height){cv.width=w;cv.height=h;}}
+window.addEventListener('resize',resize);
+window.addEventListener('load',resize);
+try{new ResizeObserver(resize).observe(document.getElementById('wrap'));}catch(e){}
+resize();
 function vp(){const s=Math.min(cv.width/W,cv.height/H);return {s,ox:(cv.width-W*s)/2,oy:(cv.height-H*s)/2};}
 
 // ================================================== CAMERA
@@ -485,7 +491,7 @@ function render(){buildCam();const v=vp();ctx.setTransform(1,0,0,1,0,0);ctx.clea
 
 // ================================================== LOOP
 let last=performance.now();
-function frame(now){let dt=(now-last)/1000;last=now;if(dt>.05)dt=.05;update(dt);render();requestAnimationFrame(frame);}
+function frame(now){resize();let dt=(now-last)/1000;last=now;if(dt>.05)dt=.05;update(dt);render();requestAnimationFrame(frame);}
 requestAnimationFrame(frame);
 })();
 </script>
